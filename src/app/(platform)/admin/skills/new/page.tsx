@@ -1,16 +1,22 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import { upsertSkill } from "@/app/(platform)/admin/catalog/actions";
 import { BlogMarkdownEditor } from "@/components/admin/blog-markdown-editor";
 import {
   AiDraftAssistant,
   type DraftPayload,
 } from "@/components/admin/ai-draft-assistant";
+import {
+  DistributionFields,
+  emptyDistribution,
+  type DistributionState,
+} from "@/components/admin/distribution-fields";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { categoryRecords } from "@/lib/mock-data";
+import { useCategories } from "@/lib/categories/context";
 import {
   ADOPTION_STAGES,
   resolveAdoptionStages,
@@ -35,11 +41,16 @@ function slugify(name: string) {
 
 export default function NewSkillPage() {
   const router = useRouter();
+  const { categories } = useCategories();
   const formRef = useRef<HTMLFormElement>(null);
   const [flashDraft, setFlashDraft] = useState(false);
   const [name, setName] = useState("");
   const [tagline, setTagline] = useState("");
-  const [categoryId, setCategoryId] = useState(categoryRecords[3]?.id ?? "cat_review");
+  const defaultCategoryId =
+    categories.find((c) => c.id === "cat_review")?.id ??
+    categories[0]?.id ??
+    "cat_review";
+  const [categoryId, setCategoryId] = useState(defaultCategoryId);
   const [description, setDescription] = useState("");
   const [documentation, setDocumentation] = useState("");
   const [bodyMarkdown, setBodyMarkdown] = useState("");
@@ -48,6 +59,9 @@ export default function NewSkillPage() {
   const [ladderKey, setLadderKey] = useState<keyof typeof LADDER_PRESETS>("full");
   const [coverImage, setCoverImage] = useState("");
   const [contentStatus, setContentStatus] = useState<"draft" | "published">("draft");
+  const [distribution, setDistribution] = useState<DistributionState>(emptyDistribution);
+  const [saving, startSaving] = useTransition();
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const applyDraft = (d: DraftPayload) => {
     setName(d.name);
@@ -67,16 +81,34 @@ export default function NewSkillPage() {
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
+    setSaveError(null);
     const slug = slugify(name);
-    void slug;
-    void resolveAdoptionStages(LADDER_PRESETS[ladderKey]);
-    void documentation;
-    void status;
-    void coverImage;
-    alert(
-      `Saved skill as ${contentStatus} (mock). Slug would be "${slug}". Connect API to persist.`,
-    );
-    router.push("/admin/skills");
+    const adoptionStages = resolveAdoptionStages(LADDER_PRESETS[ladderKey]);
+    startSaving(async () => {
+      const result = await upsertSkill({
+        slug,
+        name,
+        tagline,
+        categoryId,
+        description,
+        documentation,
+        bodyMarkdown,
+        author,
+        status,
+        coverImage,
+        adoptionStages,
+        contentStatus,
+        downloadUrl: distribution.downloadUrl,
+        repoUrl: distribution.repoUrl,
+        external: distribution.external,
+      });
+      if (!result.ok) {
+        setSaveError(result.message);
+        return;
+      }
+      router.push("/admin/skills");
+      router.refresh();
+    });
   };
 
   return (
@@ -152,7 +184,7 @@ export default function NewSkillPage() {
                 onChange={(e) => setCategoryId(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 p-2 text-sm outline-none"
               >
-                {categoryRecords.map((c) => (
+                {categories.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
@@ -190,6 +222,30 @@ export default function NewSkillPage() {
             <BlogMarkdownEditor value={bodyMarkdown} onChange={setBodyMarkdown} />
           </div>
         </section>
+
+        <DistributionFields
+          kind="skill"
+          slug={name ? slugify(name) : undefined}
+          value={distribution}
+          onChange={setDistribution}
+          onRepoPrefill={(p) => {
+            if (p.name) setName(p.name);
+            if (p.tagline) setTagline(p.tagline);
+            if (p.description) {
+              setDescription(p.description);
+              setDocumentation(p.description);
+            }
+            if (p.bodyMarkdown) setBodyMarkdown(p.bodyMarkdown);
+            setFlashDraft(true);
+            window.setTimeout(() => setFlashDraft(false), 2300);
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+              });
+            });
+          }}
+          className={flashDraft ? "ai-draft-pulse" : undefined}
+        />
 
         <section
           className={cn(
@@ -240,14 +296,23 @@ export default function NewSkillPage() {
           </div>
         </section>
 
-        <div className="flex flex-wrap gap-3">
-          <Button type="submit">Save (mock)</Button>
-          <Link
-            href="/admin/skills"
-            className={cn(buttonVariants({ variant: "outline" }), "inline-flex")}
-          >
-            Cancel
-          </Link>
+        <div className="space-y-2">
+          {saveError ? (
+            <p className="text-sm text-red-400" role="alert">
+              {saveError}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-3">
+            <Button type="submit" disabled={saving}>
+              {saving ? "Saving…" : "Save"}
+            </Button>
+            <Link
+              href="/admin/skills"
+              className={cn(buttonVariants({ variant: "outline" }), "inline-flex")}
+            >
+              Cancel
+            </Link>
+          </div>
         </div>
       </form>
     </section>

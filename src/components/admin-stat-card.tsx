@@ -5,7 +5,7 @@ import { GlowCard } from "@/components/ui/glow-card";
 type Props = {
   label: string;
   value: string;
-  spark: React.ReactNode;
+  spark?: React.ReactNode;
 };
 
 export function AdminStatCard({ label, value, spark }: Props) {
@@ -20,7 +20,7 @@ export function AdminStatCard({ label, value, spark }: Props) {
             {value}
           </p>
         </div>
-        {spark}
+        {spark ?? null}
       </div>
     </GlowCard>
   );

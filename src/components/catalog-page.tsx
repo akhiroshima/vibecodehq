@@ -5,32 +5,36 @@ import { Search } from "lucide-react";
 import { StageDisplay } from "@/components/depth-stage-pills";
 import { HoverEffect } from "@/components/ui/card-hover-effect";
 import {
-  catalogCategoryFilterOptions,
-  getCategoryLabel,
   getPublishedSkills,
   getPublishedTools,
+  type Skill,
+  type Tool,
 } from "@/lib/mock-data";
+import { useCategories } from "@/lib/categories/context";
 import { useMembership } from "@/lib/membership/context";
 import type { AssetKind } from "@/lib/membership/types";
 import { cn } from "@/lib/utils";
 
 type CatalogPageProps = {
   kind: "tools" | "skills";
+  items?: Tool[] | Skill[];
 };
 
-export function CatalogPage({ kind }: CatalogPageProps) {
+export function CatalogPage({ kind, items }: CatalogPageProps) {
   const { get } = useMembership();
+  const { getLabel, filterOptions } = useCategories();
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
 
-  const source = kind === "tools" ? getPublishedTools() : getPublishedSkills();
+  const source: (Tool | Skill)[] =
+    items ?? (kind === "tools" ? getPublishedTools() : getPublishedSkills());
   const heading = kind === "tools" ? "Tool catalog" : "Asra skills";
   const searchId = `catalog-search-${kind}`;
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return source.filter((item) => {
-      const catLabel = getCategoryLabel(item.categoryId);
+      const catLabel = getLabel(item.categoryId);
       const categoryMatch = activeCategory === "All" || catLabel === activeCategory;
       const haystack = [item.name, item.tagline, item.description, catLabel]
         .join(" ")
@@ -38,11 +42,11 @@ export function CatalogPage({ kind }: CatalogPageProps) {
       const queryMatch = !q || haystack.includes(q);
       return categoryMatch && queryMatch;
     });
-  }, [source, activeCategory, query]);
+  }, [source, activeCategory, query, getLabel]);
 
   const cardItems = filtered.map((item) => ({
     title: item.name,
-    description: `${item.tagline} • ${getCategoryLabel(item.categoryId)}`,
+    description: `${item.tagline} • ${getLabel(item.categoryId)}`,
     link: `/${kind}/${item.slug}`,
     status:
       kind === "skills" && "status" in item
@@ -77,7 +81,7 @@ export function CatalogPage({ kind }: CatalogPageProps) {
           Category
         </p>
         <div className="flex flex-wrap gap-2">
-          {catalogCategoryFilterOptions.map((category) => {
+          {filterOptions.map((category) => {
             const active = activeCategory === category;
             return (
               <button
@@ -110,10 +114,7 @@ export function CatalogPage({ kind }: CatalogPageProps) {
             const status = item.status ?? "active";
             const slug = item.link.split("/").pop() ?? "";
             const assetKind: AssetKind = kind === "tools" ? "tool" : "skill";
-            const catalogItem =
-              kind === "tools"
-                ? getPublishedTools().find((t) => t.slug === slug)
-                : getPublishedSkills().find((s) => s.slug === slug);
+            const catalogItem = source.find((c) => c.slug === slug);
             const m = catalogItem
               ? get(assetKind, catalogItem.id)
               : undefined;

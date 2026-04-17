@@ -2,12 +2,15 @@ import Link from "next/link";
 import Image from "next/image";
 import { CommentsSection } from "@/components/comments-section";
 import { ArticleBody } from "@/components/article-body";
-import { getCategoryLabel, getSkillBySlug, commentsByEntity } from "@/lib/mock-data";
+import { getSkillBySlugAny } from "@/lib/catalog/repo";
+import { getCategoryLabelAsync } from "@/lib/categories/server";
+import { listCommentsForEntity } from "@/lib/comments/repo";
 import { AdoptionRail } from "@/components/adoption-rail";
+import { ExternalBadge } from "@/components/external-badge";
 import { cn } from "@/lib/utils";
 
-export function SkillDetailPage({ slug }: { slug: string }) {
-  const skill = getSkillBySlug(slug);
+export async function SkillDetailPage({ slug }: { slug: string }) {
+  const skill = await getSkillBySlugAny(slug);
   if (!skill) {
     return (
       <section className="rounded-2xl border border-dashed border-white/20 bg-black/35 p-10 text-center">
@@ -20,7 +23,8 @@ export function SkillDetailPage({ slug }: { slug: string }) {
     );
   }
 
-  const comments = commentsByEntity[`skill:${skill.slug}`] ?? [];
+  const categoryLabel = await getCategoryLabelAsync(skill.categoryId);
+  const comments = await listCommentsForEntity("skill", skill.id);
 
   return (
     <section className="space-y-8">
@@ -28,7 +32,7 @@ export function SkillDetailPage({ slug }: { slug: string }) {
         <div className="min-w-0 space-y-8">
           <header className="space-y-3">
             <p className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">
-              {getCategoryLabel(skill.categoryId)}
+              {categoryLabel}
             </p>
             <h1 className="text-3xl font-semibold tracking-tight text-neutral-100">
               {skill.name}
@@ -48,6 +52,7 @@ export function SkillDetailPage({ slug }: { slug: string }) {
               <span className="rounded-full border border-white/15 px-3 py-1 text-xs text-neutral-400">
                 By {skill.author}
               </span>
+              {skill.external ? <ExternalBadge /> : null}
             </div>
           </header>
 
@@ -71,7 +76,12 @@ export function SkillDetailPage({ slug }: { slug: string }) {
 
           <ArticleBody markdown={skill.bodyMarkdown} />
 
-          <CommentsSection initialComments={comments} />
+          <CommentsSection
+            entityKind="skill"
+            entityId={skill.id}
+            entitySlug={skill.slug}
+            initialComments={comments}
+          />
         </div>
 
         <aside className="lg:sticky lg:top-6 lg:h-fit lg:self-start">
@@ -83,6 +93,7 @@ export function SkillDetailPage({ slug }: { slug: string }) {
             adoptionStages={skill.adoptionStages}
             downloadUrl={skill.downloadUrl !== "#" ? skill.downloadUrl : undefined}
             downloadLabel="Download skill package"
+            repoUrl={skill.repoUrl || undefined}
           />
         </aside>
       </div>

@@ -103,6 +103,12 @@ export type Tool = {
   /** Optional ladder; last entry must be `expert`. Omitted → default four-step ladder in UI. */
   adoptionStages?: AdoptionStage[];
   contentStatus: ContentStatus;
+  /** Public URL to a downloadable distribution asset (uploaded or pasted). */
+  downloadUrl?: string;
+  /** Optional source repo (typically GitHub). */
+  repoUrl?: string;
+  /** Tool is shared from outside Deloitte — surface an "external resource" badge. */
+  external?: boolean;
 };
 
 export type Skill = {
@@ -117,6 +123,10 @@ export type Skill = {
   author: string;
   status: "active" | "beta";
   downloadUrl: string;
+  /** Optional source repo (typically GitHub). */
+  repoUrl?: string;
+  /** Skill is shared from outside Deloitte — surface an "external resource" badge. */
+  external?: boolean;
   adoptionCount: number;
   createdAt: string;
   updatedAt: string;

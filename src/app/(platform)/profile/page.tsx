@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import {
-  currentUser,
-  getCategoryLabel,
   getPublishedSkills,
   getPublishedTools,
   userActivityLog,
   userSkillBadges,
   formatRelativeTime,
 } from "@/lib/mock-data";
+import { useCategories } from "@/lib/categories/context";
+import { useSessionUser } from "@/lib/auth/current-user-context";
+import { ChangePasswordForm } from "@/components/profile/change-password-form";
 import { ProfileAdoptionRing } from "@/components/profile-adoption-ring";
 import { GlowCard } from "@/components/ui/glow-card";
 import { cn } from "@/lib/utils";
@@ -18,7 +19,9 @@ import { isUsingPlus } from "@/lib/membership/types";
 import { StageDisplay } from "@/components/depth-stage-pills";
 
 export default function ProfilePage() {
+  const currentUser = useSessionUser();
   const { get, trackedProgress } = useMembership();
+  const { getLabel } = useCategories();
   const publishedSkills = getPublishedSkills();
 
   return (
@@ -80,7 +83,7 @@ export default function ProfilePage() {
                       </Link>
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-xs text-neutral-500">
-                          {getCategoryLabel(tool.categoryId)}
+                          {getLabel(tool.categoryId)}
                         </span>
                         <StageDisplay stage={stage} />
                         {tracked ? (
@@ -163,6 +166,8 @@ export default function ProfilePage() {
               </GlowCard>
             </Link>
           </div>
+
+          <ChangePasswordForm />
         </div>
       </div>
     </section>

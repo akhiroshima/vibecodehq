@@ -1,13 +1,17 @@
 import { CommentsSection } from "@/components/comments-section";
 import { ArticleBody } from "@/components/article-body";
 import { CodeBlock } from "@/components/ui/code-block";
-import { getCategoryLabel, getToolBySlug, commentsByEntity } from "@/lib/mock-data";
+import { getToolBySlugAny } from "@/lib/catalog/repo";
+import { getCategoryLabelAsync } from "@/lib/categories/server";
+import { listCommentsForEntity } from "@/lib/comments/repo";
 import Link from "next/link";
 import Image from "next/image";
 import { AdoptionRail } from "@/components/adoption-rail";
+import { ExternalBadge } from "@/components/external-badge";
 
-export function ToolDetailPage({ slug }: { slug: string }) {
-  const tool = getToolBySlug(slug);
+export async function ToolDetailPage({ slug }: { slug: string }) {
+  const tool = await getToolBySlugAny(slug);
+  const categoryLabel = tool ? await getCategoryLabelAsync(tool.categoryId) : "";
 
   if (!tool) {
     return (
@@ -21,7 +25,7 @@ export function ToolDetailPage({ slug }: { slug: string }) {
     );
   }
 
-  const comments = commentsByEntity[`tool:${tool.slug}`] ?? [];
+  const comments = await listCommentsForEntity("tool", tool.id);
 
   return (
     <section className="space-y-8">
@@ -29,12 +33,17 @@ export function ToolDetailPage({ slug }: { slug: string }) {
         <div className="min-w-0 space-y-8">
           <header className="space-y-3">
             <p className="text-[11px] font-medium uppercase tracking-wider text-neutral-500">
-              {getCategoryLabel(tool.categoryId)}
+              {categoryLabel}
             </p>
             <h1 className="text-3xl font-semibold tracking-tight text-neutral-100">
               {tool.name}
             </h1>
             <p className="text-sm leading-relaxed text-neutral-300">{tool.description}</p>
+            {tool.external ? (
+              <div className="flex flex-wrap gap-2">
+                <ExternalBadge />
+              </div>
+            ) : null}
           </header>
 
           {tool.coverImage ? (
@@ -94,7 +103,12 @@ export function ToolDetailPage({ slug }: { slug: string }) {
             </div>
           </section>
 
-          <CommentsSection initialComments={comments} />
+          <CommentsSection
+            entityKind="tool"
+            entityId={tool.id}
+            entitySlug={tool.slug}
+            initialComments={comments}
+          />
         </div>
 
         <aside className="lg:sticky lg:top-6 lg:h-fit lg:self-start">
@@ -104,6 +118,9 @@ export function ToolDetailPage({ slug }: { slug: string }) {
             studioReach={tool.adoptionCount}
             resourceCount={tool.resources.length}
             adoptionStages={tool.adoptionStages}
+            downloadUrl={tool.downloadUrl && tool.downloadUrl !== "#" ? tool.downloadUrl : undefined}
+            downloadLabel="Download tool"
+            repoUrl={tool.repoUrl || undefined}
           />
         </aside>
       </div>

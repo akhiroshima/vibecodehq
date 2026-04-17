@@ -5,18 +5,17 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TextGenerateEffect } from "@/components/ui/text-generate-effect";
 import { GlowCard } from "@/components/ui/glow-card";
-import {
-  buildFeedItems,
-  currentUser,
-  formatRelativeTime,
-  getDraftSkills,
-  getDraftTools,
-  getStudioById,
-  hqStudioMetrics,
-  type FeedItem,
-} from "@/lib/mock-data";
+import { formatRelativeTime, type FeedItem } from "@/lib/mock-data";
+import { useSessionUser } from "@/lib/auth/current-user-context";
 import { useMembership } from "@/lib/membership/context";
 import { cn } from "@/lib/utils";
+
+type HqMetrics = {
+  memberCount: number;
+  membersAtUsingPlusPct: number;
+  shippedLast30Days: number;
+  adoptionVelocityWoWPct: number;
+};
 
 const PAGE_SIZE = 6;
 
@@ -106,12 +105,17 @@ function MiniRing({ pct }: { pct: number }) {
   );
 }
 
-export function BentoDashboard() {
+type BentoDashboardProps = {
+  items: FeedItem[];
+  hq: HqMetrics;
+  studioCity?: string;
+  draftCount: number;
+};
+
+export function BentoDashboard({ items, hq, studioCity, draftCount }: BentoDashboardProps) {
+  const currentUser = useSessionUser();
   const { trackedProgress } = useMembership();
-  const draftTools = useMemo(() => getDraftTools(), []);
-  const draftSkills = useMemo(() => getDraftSkills(), []);
-  const draftCount = draftTools.length + draftSkills.length;
-  const allItems = useMemo(() => buildFeedItems(), []);
+  const allItems = useMemo(() => items, [items]);
   const [query, setQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -152,9 +156,6 @@ export function BentoDashboard() {
   }, [filteredItems.length, loadMore, visibleCount]);
 
   const firstName = currentUser.name.split(" ")[0] ?? "there";
-  const studioCity = currentUser.studioId
-    ? getStudioById(currentUser.studioId)?.city
-    : undefined;
   const welcomeWords = studioCity
     ? `Welcome back, ${firstName}. ${studioCity} studio. Here’s what shipped recently.`
     : `Welcome back, ${firstName}. Here’s what shipped recently.`;
@@ -183,30 +184,36 @@ export function BentoDashboard() {
                   Member engagement
                 </p>
                 <p className="mt-1 text-2xl font-semibold tabular-nums text-neutral-100">
-                  {hqStudioMetrics.membersAtUsingPlusPct}%
+                  {hq.membersAtUsingPlusPct}%
                 </p>
                 <p className="mt-2 text-[10px] leading-snug text-neutral-600">
-                  Members with ≥1 core tool at using+ (rolling quarter; mock).
+                  Members with ≥1 core tool at using+ across the workspace.
                 </p>
               </div>
               <div className="rounded-xl border border-white/[0.06] bg-black/25 p-3">
                 <p className="text-[11px] text-neutral-500">
                   Adoption velocity
                 </p>
-                <p className="mt-1 text-2xl font-semibold tabular-nums text-emerald-400">
-                  +{hqStudioMetrics.adoptionVelocityWoWPct}%
+                <p
+                  className={cn(
+                    "mt-1 text-2xl font-semibold tabular-nums",
+                    hq.adoptionVelocityWoWPct >= 0 ? "text-emerald-400" : "text-rose-400",
+                  )}
+                >
+                  {hq.adoptionVelocityWoWPct >= 0 ? "+" : ""}
+                  {hq.adoptionVelocityWoWPct}%
                 </p>
                 <p className="mt-2 text-[10px] leading-snug text-neutral-600">
-                  WoW lift in using+ transitions (mock).
+                  WoW lift in using+ transitions across members.
                 </p>
               </div>
               <div className="rounded-xl border border-white/[0.06] bg-black/25 p-3">
                 <p className="text-[11px] text-neutral-500">Shipped (30d)</p>
                 <p className="mt-1 text-2xl font-semibold tabular-nums text-neutral-100">
-                  {hqStudioMetrics.shippedLast30Days}
+                  {hq.shippedLast30Days}
                 </p>
                 <p className="mt-2 text-[10px] leading-snug text-neutral-600">
-                  Tools/skills updated or added in the catalog (mock).
+                  Tools/skills updated or added in the catalog.
                 </p>
               </div>
             </div>

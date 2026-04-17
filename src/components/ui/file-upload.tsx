@@ -26,16 +26,49 @@ const secondaryVariant = {
   },
 };
 
+type FileUploadProps = {
+  onChange?: (files: File[]) => void;
+  multiple?: boolean;
+  /** Dropzone accept map, e.g. { "application/pdf": [".pdf"] }. Defaults to docs + text + zip. */
+  accept?: Record<string, string[]>;
+  /** Comma-separated value for the native <input accept>. Defaults to a broad doc set. */
+  inputAccept?: string;
+  /** Human-readable hint shown under the upload area. */
+  hint?: string;
+  /** Reset internal file list on each new selection (useful for one-shot uploads). */
+  replaceOnChange?: boolean;
+};
+
+const DEFAULT_DROPZONE_ACCEPT: Record<string, string[]> = {
+  "text/plain": [".txt", ".md", ".markdown", ".csv", ".tsv", ".log", ".yml", ".yaml", ".xml", ".html", ".htm", ".rst"],
+  "text/markdown": [".md", ".markdown"],
+  "application/json": [".json"],
+  "application/pdf": [".pdf"],
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
+  "application/zip": [".zip"],
+  "application/x-zip-compressed": [".zip"],
+};
+
+const DEFAULT_INPUT_ACCEPT =
+  ".md,.markdown,.txt,.csv,.tsv,.log,.yml,.yaml,.xml,.html,.htm,.json,.pdf,.docx,.zip,text/plain,text/markdown,application/json,application/pdf,application/zip,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
 export const FileUpload = ({
   onChange,
-}: {
-  onChange?: (files: File[]) => void;
-}) => {
+  multiple = false,
+  accept = DEFAULT_DROPZONE_ACCEPT,
+  inputAccept = DEFAULT_INPUT_ACCEPT,
+  hint,
+  replaceOnChange = false,
+}: FileUploadProps) => {
   const [files, setFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (newFiles: File[]) => {
-    setFiles((prevFiles) => [...prevFiles, ...newFiles]);
+    if (replaceOnChange) {
+      setFiles(newFiles);
+    } else {
+      setFiles((prevFiles) => [...prevFiles, ...newFiles]);
+    }
     onChange && onChange(newFiles);
   };
 
@@ -44,12 +77,9 @@ export const FileUpload = ({
   };
 
   const { getRootProps, isDragActive } = useDropzone({
-    multiple: false,
+    multiple,
     noClick: true,
-    accept: {
-      "text/plain": [".txt", ".md"],
-      "text/markdown": [".md"],
-    },
+    accept,
     onDrop: handleFileChange,
     onDropRejected: (error) => {
       console.log(error);
@@ -67,7 +97,8 @@ export const FileUpload = ({
           ref={fileInputRef}
           id="file-upload-handle"
           type="file"
-          accept=".md,.txt,text/plain,text/markdown"
+          multiple={multiple}
+          accept={inputAccept}
           onChange={(e) => handleFileChange(Array.from(e.target.files || []))}
           className="hidden"
         />
@@ -81,6 +112,11 @@ export const FileUpload = ({
           <p className="relative z-20 mt-2 font-sans text-base font-normal text-neutral-400 dark:text-neutral-400">
             Drag or drop your files here or click to upload
           </p>
+          {hint ? (
+            <p className="relative z-20 mt-1 max-w-md text-center text-xs text-neutral-500 dark:text-neutral-500">
+              {hint}
+            </p>
+          ) : null}
           <div className="relative mx-auto mt-10 w-full max-w-xl">
             {files.length > 0 &&
               files.map((file, idx) => (

@@ -22,7 +22,20 @@ type AdoptionRailProps = {
   adoptionStages?: AdoptionStage[];
   downloadUrl?: string;
   downloadLabel?: string;
+  repoUrl?: string;
 };
+
+function repoHostLabel(url: string): string {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "");
+    if (host.includes("github")) return "View on GitHub";
+    if (host.includes("gitlab")) return "View on GitLab";
+    if (host.includes("bitbucket")) return "View on Bitbucket";
+    return "View repository";
+  } catch {
+    return "View repository";
+  }
+}
 
 export function AdoptionRail({
   assetKind,
@@ -32,6 +45,7 @@ export function AdoptionRail({
   adoptionStages: adoptionStagesProp,
   downloadUrl,
   downloadLabel = "Download package",
+  repoUrl,
 }: AdoptionRailProps) {
   const { get, setStage, setTracked } = useMembership();
   const m =
@@ -93,16 +107,35 @@ export function AdoptionRail({
         <p className="mt-1 text-sm text-neutral-200">{resourceCount} linked</p>
       </div>
 
-      {downloadUrl ? (
-        <a
-          href={downloadUrl}
-          className={cn(
-            buttonVariants({ variant: "outline", size: "default" }),
-            "flex w-full justify-center",
-          )}
-        >
-          {downloadLabel}
-        </a>
+      {downloadUrl || repoUrl ? (
+        <div className="space-y-2">
+          {downloadUrl ? (
+            <a
+              href={downloadUrl}
+              target="_blank"
+              rel="noreferrer"
+              className={cn(
+                buttonVariants({ variant: "default", size: "default" }),
+                "flex w-full justify-center",
+              )}
+            >
+              {downloadLabel}
+            </a>
+          ) : null}
+          {repoUrl ? (
+            <a
+              href={repoUrl}
+              target="_blank"
+              rel="noreferrer"
+              className={cn(
+                buttonVariants({ variant: "outline", size: "default" }),
+                "flex w-full justify-center",
+              )}
+            >
+              {repoHostLabel(repoUrl)}
+            </a>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

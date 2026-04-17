@@ -1,16 +1,23 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import { upsertTool } from "@/app/(platform)/admin/catalog/actions";
 import { BlogMarkdownEditor } from "@/components/admin/blog-markdown-editor";
 import {
   AiDraftAssistant,
   type DraftPayload,
 } from "@/components/admin/ai-draft-assistant";
+import {
+  DistributionFields,
+  emptyDistribution,
+  type DistributionState,
+} from "@/components/admin/distribution-fields";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { categoryRecords, type Tool } from "@/lib/mock-data";
+import { type Tool } from "@/lib/mock-data";
+import { useCategories } from "@/lib/categories/context";
 import {
   ADOPTION_STAGES,
   resolveAdoptionStages,
@@ -35,11 +42,12 @@ function slugify(name: string) {
 
 export default function NewToolPage() {
   const router = useRouter();
+  const { categories } = useCategories();
   const formRef = useRef<HTMLFormElement>(null);
   const [flashDraft, setFlashDraft] = useState(false);
   const [name, setName] = useState("");
   const [tagline, setTagline] = useState("");
-  const [categoryId, setCategoryId] = useState(categoryRecords[0]?.id ?? "cat_ai");
+  const [categoryId, setCategoryId] = useState(categories[0]?.id ?? "cat_ai");
   const [description, setDescription] = useState("");
   const [bodyMarkdown, setBodyMarkdown] = useState("");
   const [installSteps, setInstallSteps] = useState<string[]>([""]);
@@ -50,6 +58,9 @@ export default function NewToolPage() {
   const [resources, setResources] = useState<Tool["resources"]>(() => [
     { id: `r_${Date.now()}`, type: "link", title: "", url: "" },
   ]);
+  const [distribution, setDistribution] = useState<DistributionState>(emptyDistribution);
+  const [saving, startSaving] = useTransition();
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const adoptionStages = useMemo(
     () => resolveAdoptionStages(LADDER_PRESETS[ladderKey]),
@@ -76,15 +87,38 @@ export default function NewToolPage() {
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
+    setSaveError(null);
     const slug = slugify(name);
-    // Mock save — backend would persist.
-    void slug;
-    void adoptionStages;
-    void resources;
-    alert(
-      `Saved as ${contentStatus} (mock). Slug would be "${slug}". Connect API to persist.`,
-    );
-    router.push("/admin/tools");
+    const commands = commandsText
+      .split("\n")
+      .map((c) => c.trim())
+      .filter(Boolean);
+
+    startSaving(async () => {
+      const result = await upsertTool({
+        slug,
+        name,
+        tagline,
+        categoryId,
+        description,
+        bodyMarkdown,
+        installSteps,
+        commands,
+        resources,
+        coverImage,
+        adoptionStages,
+        contentStatus,
+        downloadUrl: distribution.downloadUrl,
+        repoUrl: distribution.repoUrl,
+        external: distribution.external,
+      });
+      if (!result.ok) {
+        setSaveError(result.message);
+        return;
+      }
+      router.push("/admin/tools");
+      router.refresh();
+    });
   };
 
   return (
@@ -141,7 +175,7 @@ export default function NewToolPage() {
                 onChange={(e) => setCategoryId(e.target.value)}
                 className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 p-2 text-sm outline-none"
               >
-                {categoryRecords.map((c) => (
+                {categories.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
@@ -312,6 +346,27 @@ export default function NewToolPage() {
           </div>
         </section>
 
+        <DistributionFields
+          kind="tool"
+          slug={name ? slugify(name) : undefined}
+          value={distribution}
+          onChange={setDistribution}
+          onRepoPrefill={(p) => {
+            if (p.name) setName(p.name);
+            if (p.tagline) setTagline(p.tagline);
+            if (p.description) setDescription(p.description);
+            if (p.bodyMarkdown) setBodyMarkdown(p.bodyMarkdown);
+            setFlashDraft(true);
+            window.setTimeout(() => setFlashDraft(false), 2300);
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+              });
+            });
+          }}
+          className={flashDraft ? "ai-draft-pulse" : undefined}
+        />
+
         <section
           className={cn(
             "rounded-2xl border border-white/[0.08] bg-neutral-950/70 p-6",
@@ -353,14 +408,23 @@ export default function NewToolPage() {
           </div>
         </section>
 
-        <div className="flex flex-wrap gap-3">
-          <Button type="submit">Save (mock)</Button>
-          <Link
-            href="/admin/tools"
-            className={cn(buttonVariants({ variant: "outline" }), "inline-flex")}
-          >
-            Cancel
-          </Link>
+        <div className="space-y-2">
+          {saveError ? (
+            <p className="text-sm text-red-400" role="alert">
+              {saveError}
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-3">
+            <Button type="submit" disabled={saving}>
+              {saving ? "Saving…" : "Save"}
+            </Button>
+            <Link
+              href="/admin/tools"
+              className={cn(buttonVariants({ variant: "outline" }), "inline-flex")}
+            >
+              Cancel
+            </Link>
+          </div>
         </div>
       </form>
     </section>

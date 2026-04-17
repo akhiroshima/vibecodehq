@@ -11,17 +11,21 @@ import {
 } from "@/components/ui/sidebar";
 import {
   BookOpen,
+  Building2,
   Home,
   LayoutGrid,
   Megaphone,
   Package,
   Sparkles,
   Tags,
+  Users,
   Wrench,
 } from "lucide-react";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { cn } from "@/lib/utils";
-import { currentUser } from "@/lib/mock-data";
+import { useSessionUser } from "@/lib/auth/current-user-context";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { signOut } from "@/app/login/actions";
 import { motion } from "motion/react";
 import Link from "next/link";
 
@@ -48,6 +52,8 @@ const adminNav = [
   { label: "Skills", href: "/admin/skills", icon: Sparkles },
   { label: "Announcements", href: "/admin/announcements", icon: Megaphone },
   { label: "Categories", href: "/admin/categories", icon: Tags },
+  { label: "Studios", href: "/admin/studios", icon: Building2 },
+  { label: "Users", href: "/admin/users", icon: Users },
 ];
 
 function LogoMark() {
@@ -66,6 +72,7 @@ function LogoMark() {
 function SidebarContent() {
   const pathname = usePathname();
   const { open } = useSidebar();
+  const currentUser = useSessionUser();
 
   return (
     <div className="flex h-full min-h-0 flex-col justify-between overflow-hidden py-2">
@@ -177,6 +184,16 @@ function SidebarContent() {
               {currentUser.name}
             </p>
             <p className="truncate text-xs text-neutral-500">{currentUser.email}</p>
+            {isSupabaseConfigured() ? (
+              <form action={signOut} className="mt-3">
+                <button
+                  type="submit"
+                  className="w-full rounded-lg border border-white/15 bg-black/30 px-2 py-1.5 text-xs text-neutral-300 hover:bg-white/5"
+                >
+                  Sign out
+                </button>
+              </form>
+            ) : null}
           </div>
         ) : (
           <Link
@@ -193,12 +210,13 @@ function SidebarContent() {
 }
 
 export function AppShell({ children }: AppShellProps) {
+  const currentUser = useSessionUser();
   const navItems = useMemo(
     () =>
       currentUser.role === "prime_mover"
         ? [...designerNav, ...adminNav]
         : designerNav,
-    [],
+    [currentUser.role],
   );
 
   const floatingNavItems = navItems.map((item) => {

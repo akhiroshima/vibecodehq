@@ -4,65 +4,63 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
-  startTransition,
   useState,
 } from "react";
-import type { AssetKind, AdoptionStage, UserAssetMembership } from "@/lib/membership/types";
-import { createLocalStorageRepository } from "@/lib/membership/repository";
-import {
-  buildSeedMemberships,
-  ensureAllCatalogEntries,
-} from "@/lib/membership/seed";
+import type {
+  AssetKind,
+  AdoptionStage,
+  UserAssetMembership,
+} from "@/lib/membership/types";
 import {
   getMembership as selectMembership,
   getTrackedAdoptionProgress,
   upsertMembership,
 } from "@/lib/membership/selectors";
+import { upsertMembershipAction } from "@/lib/membership/actions";
 
 type MembershipContextValue = {
   memberships: UserAssetMembership[];
   get: (assetKind: AssetKind, assetId: string) => UserAssetMembership | undefined;
   setStage: (assetKind: AssetKind, assetId: string, stage: AdoptionStage) => void;
   setTracked: (assetKind: AssetKind, assetId: string, tracked: boolean) => void;
-  patch: (patch: Partial<UserAssetMembership> & Pick<UserAssetMembership, "assetKind" | "assetId">) => void;
+  patch: (
+    patch: Partial<UserAssetMembership> & Pick<UserAssetMembership, "assetKind" | "assetId">,
+  ) => void;
   trackedProgress: ReturnType<typeof getTrackedAdoptionProgress>;
 };
 
 const MembershipContext = createContext<MembershipContextValue | null>(null);
 
-const repo = createLocalStorageRepository();
+export function MembershipProvider({
+  initial,
+  children,
+}: {
+  initial: UserAssetMembership[];
+  children: React.ReactNode;
+}) {
+  const [memberships, setMemberships] = useState<UserAssetMembership[]>(initial);
 
-export function MembershipProvider({ children }: { children: React.ReactNode }) {
-  const [memberships, setMemberships] = useState<UserAssetMembership[]>(() =>
-    ensureAllCatalogEntries(buildSeedMemberships()),
-  );
-
-  useEffect(() => {
-    const stored = repo.load();
-    if (stored.length) {
-      startTransition(() => {
-        setMemberships(ensureAllCatalogEntries(stored));
+  const persist = useCallback(
+    (p: Partial<UserAssetMembership> & Pick<UserAssetMembership, "assetKind" | "assetId">) => {
+      void upsertMembershipAction({
+        assetKind: p.assetKind,
+        assetId: p.assetId,
+        stage: p.stage,
+        tracked: p.tracked,
+      }).catch(() => {
+        /* server-side already logs; UI stays optimistic */
       });
-    }
-  }, []);
-
-  useEffect(() => {
-    repo.save(memberships);
-  }, [memberships]);
-
-  const get = useCallback(
-    (assetKind: AssetKind, assetId: string) =>
-      selectMembership(memberships, assetKind, assetId),
-    [memberships],
+    },
+    [],
   );
 
   const patch = useCallback(
     (p: Partial<UserAssetMembership> & Pick<UserAssetMembership, "assetKind" | "assetId">) => {
       setMemberships((prev) => upsertMembership(prev, p));
+      persist(p);
     },
-    [],
+    [persist],
   );
 
   const setStage = useCallback(
@@ -77,6 +75,12 @@ export function MembershipProvider({ children }: { children: React.ReactNode }) 
       patch({ assetKind, assetId, tracked });
     },
     [patch],
+  );
+
+  const get = useCallback(
+    (assetKind: AssetKind, assetId: string) =>
+      selectMembership(memberships, assetKind, assetId),
+    [memberships],
   );
 
   const trackedProgress = useMemo(
